@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>World Chess Trainer</title>
+</head>
+<body>
+<div id="app">
+
+  <header>
+    <h1>♔ World Chess Trainer</h1>
+    <div class="top-controls">
+      <select id="difficulty">
+        <option value="basic">Básico</option>
+        <option value="medium" selected>Médio</option>
+        <option value="advanced">Avançado</option>
+        <option value="world">Campeonato Mundial</option>
+      </select>
+      <button id="newGame">Nova Partida</button>
+    </div>
+  </header>
+
+  <main>
+
+    <section class="board-area">
+
+      <div class="clock black" id="clockBlack">
+        <div class="player">♟ Stockfish (IA) <span id="thinkingDot" class="thinking-dot"></span></div>
+        <div id="blackTime">10:00</div>
+      </div>
+
+      <div class="board-wrapper">
+        <div id="board"></div>
+
+        <!-- Game over overlay -->
+        <div id="gameOverOverlay" class="game-over-overlay hidden">
+          <p id="gameOverMessage"></p>
+          <div class="overlay-buttons">
+            <button id="analyzeBtn">Ver Análise</button>
+            <button id="newGameOverlay">Nova Partida</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="clock white">
+        <div class="player">♙ Você</div>
+        <div id="whiteTime">10:00</div>
+      </div>
+
+    </section>
+
+    <aside>
+      <h2>Histórico</h2>
+      <div id="moves"></div>
+      <div id="move-detail"></div>
+    </aside>
+
+  </main>
+
+</div>
+
+<!-- Analysis modal -->
+<div id="analysisModal" class="modal-backdrop hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>📊 Análise da Partida</h2>
+      <button id="closeAnalysis" class="close-btn">✕</button>
+    </div>
+    <p id="analysisProgress" class="analysis-progress hidden"></p>
+    <div id="analysisContent" class="modal-body"></div>
+  </div>
+</div>
+
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>
