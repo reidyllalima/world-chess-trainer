@@ -1,4 +1,5 @@
 import { CLASSIFICATIONS, computeAccuracy } from "../analysis/gameAnalyzer.js";
+import { getOpeningAdvice } from "../openings/openingAdvice.js";
 
 let moveCount = 0;
 
@@ -33,6 +34,19 @@ export function addMove(san, color) {
   }
 
   container.scrollTop = container.scrollHeight;
+}
+
+export function updateOpeningPanel(opening) {
+  const nameEl = document.getElementById("opening-name");
+  const ecoEl  = document.getElementById("opening-eco");
+  const tipEl  = document.getElementById("opening-tip");
+
+  if (!opening) return;
+
+  const advice = getOpeningAdvice(opening.eco);
+  nameEl.textContent = opening.name;
+  ecoEl.textContent  = opening.eco;
+  tipEl.textContent  = advice.tip;
 }
 
 export function resetMoveHistory() {

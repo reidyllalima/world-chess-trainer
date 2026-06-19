@@ -4,7 +4,8 @@ import { StockfishManager } from "./engine/stockfishManager.js";
 import { Chess } from "chess.js";
 import { ChessClock } from "./clock/chessClock.js";
 import { ChessBoardUI } from "./board/board.js";
-import { addMove, resetMoveHistory, showGameOver, showAnalysisModal, hideAnalysisModal, attachAnalysisToHistory } from "./ui/ui.js";
+import { addMove, resetMoveHistory, showGameOver, showAnalysisModal, hideAnalysisModal, attachAnalysisToHistory, updateOpeningPanel } from "./ui/ui.js";
+import { detectOpening } from "./openings/openingDetector.js";
 import { gameStore } from "./data/gameStore.js";
 import { analyzeGame } from "./analysis/gameAnalyzer.js";
 
@@ -12,8 +13,29 @@ const game   = new Chess();
 const engine = new StockfishManager();
 const clock  = new ChessClock(10, 5); // 10 min + 5 sec increment
 
-let engineThinking = false;
-let gameOver       = false;
+let engineThinking  = false;
+let gameOver        = false;
+let lastOpeningName = null;
+
+function refreshOpening() {
+  const moves = gameStore.moves;
+  if (!moves.length || moves.length > 40) return;
+  const opening = detectOpening(moves);
+  if (!opening || opening.name === lastOpeningName) return;
+
+  if (lastOpeningName) {
+    const sameFamily = opening.name.split(':')[0].trim() === lastOpeningName.split(':')[0].trim();
+    if (sameFamily) {
+      // Bloqueia regressão: "Modern Variations" (depth 1) → "Sicilian Defense" (depth 0)
+      const prevDepth = (lastOpeningName.match(/:/g) ?? []).length;
+      const newDepth  = (opening.name.match(/:/g) ?? []).length;
+      if (newDepth < prevDepth) return;
+    }
+  }
+
+  lastOpeningName = opening.name;
+  updateOpeningPanel(opening);
+}
 
 function setEngineThinkingUI(thinking) {
   const dot   = document.getElementById("thinkingDot");
@@ -128,6 +150,7 @@ async function makeEngineMove() {
       gameStore.addMove({ san: move.san, from: move.from, to: move.to, fenBefore, color: "b" });
       addMove(move.san, "b");
       clock.switchTurn();
+      refreshOpening();
       checkGameOver();
     }
   } catch (err) {
@@ -162,6 +185,7 @@ async function onMove(from, to) {
     addMove(move.san, "w");
     clock.switchTurn();
     refreshBoard();
+    refreshOpening();
 
     if (checkGameOver()) return;
 
