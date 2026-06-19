@@ -13,10 +13,11 @@
     <div class="top-controls">
       <select id="difficulty">
         <option value="basic">Básico</option>
-        <option value="medium" selected>Médio</option>
+        <option value="medium">Médio</option>
         <option value="advanced">Avançado</option>
-        <option value="world">Campeonato Mundial</option>
+        <option value="world" selected>Campeonato Mundial</option>
       </select>
+      <button id="hintsToggle" class="hints-toggle">💡 Dicas</button>
       <button id="newGame">Nova Partida</button>
     </div>
   </header>
@@ -46,6 +47,14 @@
       <div class="clock white">
         <div class="player">♙ Você</div>
         <div id="whiteTime">10:00</div>
+      </div>
+
+      <div id="hint-panel" class="hint-panel hidden">
+        <span id="hint-icon" class="hint-icon"></span>
+        <div class="hint-text">
+          <strong id="hint-label"></strong>
+          <span id="hint-detail"></span>
+        </div>
       </div>
 
     </section>

@@ -6,19 +6,19 @@ export class StockfishManager {
     this.engine.postMessage("isready");
   }
 
-  getMovetime(level) {
+  getDepth(level) {
     switch (level) {
-      case "basic":    return 500;
-      case "medium":   return 1500;
-      case "advanced": return 3000;
-      case "world":    return 6000;
-      default:         return 1500;
+      case "basic":    return 3;
+      case "medium":   return 8;
+      case "advanced": return 14;
+      case "world":    return 20;
+      default:         return 8;
     }
   }
 
   bestMove(fen, level) {
     return new Promise(resolve => {
-      const movetime = this.getMovetime(level);
+      const depth = this.getDepth(level);
 
       const cleanup = (move) => {
         clearTimeout(timeout);
@@ -27,10 +27,11 @@ export class StockfishManager {
         resolve(move);
       };
 
+      // Safety net: if Stockfish never responds, unblock after 30s
       const timeout = setTimeout(() => {
         console.warn("Stockfish timeout — unblocking board");
         cleanup("(none)");
-      }, movetime + 5000);
+      }, 30000);
 
       const handler = (event) => {
         const line = event.data;
@@ -42,7 +43,7 @@ export class StockfishManager {
       this.busy = true;
       this.engine.addEventListener("message", handler);
       this.engine.postMessage(`position fen ${fen}`);
-      this.engine.postMessage(`go movetime ${movetime}`);
+      this.engine.postMessage(`go depth ${depth}`);
     });
   }
 

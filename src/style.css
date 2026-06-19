@@ -199,6 +199,70 @@ main {
   animation: opening-flash 0.7s ease-out;
 }
 
+/* ── Hint panel ──────────────────────────────────────────────────────── */
+
+.hint-panel {
+  --hint-color: #2DB582;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-left: 3px solid var(--hint-color);
+  background: rgba(255,255,255,0.04);
+  border-radius: 0 6px 6px 0;
+  margin-top: 8px;
+  animation: hint-in 0.25s ease-out;
+}
+.hint-panel.hidden { display: none; }
+
+@keyframes hint-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.hint-icon {
+  font-size: 1rem;
+  font-weight: 900;
+  color: var(--hint-color);
+  min-width: 20px;
+  text-align: center;
+}
+
+.hint-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.hint-text strong {
+  font-size: 0.82rem;
+  color: var(--hint-color);
+}
+
+.hint-text span {
+  font-size: 0.78rem;
+  color: #aaa;
+}
+
+/* ── Hints toggle button ─────────────────────────────────────────────── */
+
+.hints-toggle {
+  background: #1e1e1e;
+  border: 1px solid #333;
+  color: #888;
+  padding: 7px 14px;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.hints-toggle:hover { border-color: #555; color: #ccc; }
+.hints-toggle.active {
+  background: #1a3a2a;
+  border-color: #2DB582;
+  color: #2DB582;
+}
+
 /* ── Aside (move history) ────────────────────────────────────────── */
 
 aside {

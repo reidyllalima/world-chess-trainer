@@ -4,7 +4,7 @@ import { StockfishManager } from "./engine/stockfishManager.js";
 import { Chess } from "chess.js";
 import { ChessClock } from "./clock/chessClock.js";
 import { ChessBoardUI } from "./board/board.js";
-import { addMove, resetMoveHistory, showGameOver, showAnalysisModal, hideAnalysisModal, attachAnalysisToHistory, updateOpeningPanel } from "./ui/ui.js";
+import { addMove, resetMoveHistory, showGameOver, showAnalysisModal, hideAnalysisModal, attachAnalysisToHistory, updateOpeningPanel, showHintPanel, clearHintPanel } from "./ui/ui.js";
 import { detectOpening } from "./openings/openingDetector.js";
 import { gameStore } from "./data/gameStore.js";
 import { analyzeGame } from "./analysis/gameAnalyzer.js";
@@ -16,6 +16,8 @@ const clock  = new ChessClock(10, 5); // 10 min + 5 sec increment
 let engineThinking = false;
 let gameOver       = false;
 let lastMatchLen   = 0;
+let hintsEnabled   = false;
+let hintArrow      = []; // shapes for the hint arrow, persists across refreshBoard calls
 
 function refreshOpening() {
   const moves = gameStore.moves;
@@ -66,17 +68,16 @@ function legalMoves() {
 }
 
 function refreshBoard() {
-  const dests      = gameOver ? new Map() : legalMoves();
-  const turnColor  = game.turn() === "w" ? "white" : "black";
-  const isBasic    = document.getElementById("difficulty").value === "basic";
-  const showDests  = isBasic;
+  const dests     = gameOver ? new Map() : legalMoves();
+  const turnColor = game.turn() === "w" ? "white" : "black";
+  const isBasic   = document.getElementById("difficulty").value === "basic";
+  const showDests = isBasic;
 
-  // No modo básico, realça proativamente todas as peças que podem se mover
-  const autoShapes = (isBasic && !gameOver && turnColor === "white")
+  const basicShapes = (isBasic && !gameOver && turnColor === "white")
     ? Array.from(dests.keys()).map(sq => ({ orig: sq, brush: "paleGreen" }))
     : [];
 
-  board.setPosition(game.fen(), dests, turnColor, showDests, autoShapes);
+  board.setPosition(game.fen(), dests, turnColor, showDests, [...basicShapes, ...hintArrow]);
 }
 
 function checkGameOver() {
@@ -111,6 +112,53 @@ function endGame(message, result) {
   refreshBoard();
   showGameOver(message);
 }
+
+// ── Hint analysis ─────────────────────────────────────────────────────────────
+
+const HINT_LEVELS = [
+  { maxLoss: 10,  icon: "✦",  label: "Excelente!",   color: "#21C063" },
+  { maxLoss: 50,  icon: "✓",  label: "Boa jogada!",  color: "#2DB582" },
+  { maxLoss: 150, icon: "?!", label: "Imprecisão",   color: "#EFA010" },
+  { maxLoss: 400, icon: "?",  label: "Erro!",        color: "#D84040" },
+  { maxLoss: Infinity, icon: "??", label: "Grave Erro!", color: "#C0392B" },
+];
+
+async function analyzePlayerMove(fenBefore, playerMove) {
+  try {
+    const { bestMove, score: bestScore } = await engine.analyzePosition(fenBefore, 10);
+    const { score: scoreFromBlack }      = await engine.analyzePosition(game.fen(), 8);
+
+    const playerScore = -scoreFromBlack; // convert to white's perspective
+    const scoreLoss   = Math.max(0, bestScore - playerScore);
+
+    const playerUci  = playerMove.from + playerMove.to;
+    const isBestMove = bestMove && playerUci === bestMove.slice(0, 4);
+
+    const level = isBestMove
+      ? HINT_LEVELS[0]
+      : HINT_LEVELS.find(l => scoreLoss <= l.maxLoss) ?? HINT_LEVELS.at(-1);
+
+    let detail = isBestMove ? "Melhor jogada possível!" : "";
+
+    if (!isBestMove && bestMove && bestMove !== "(none)") {
+      try {
+        const tmp = new Chess(fenBefore);
+        const bm  = tmp.move({ from: bestMove.slice(0, 2), to: bestMove.slice(2, 4), promotion: bestMove[4] || "q" });
+        detail = `Melhor era ${bm.san}`;
+      } catch {
+        detail = `Melhor era ${bestMove}`;
+      }
+      hintArrow = [{ orig: bestMove.slice(0, 2), dest: bestMove.slice(2, 4), brush: "green" }];
+      refreshBoard();
+    }
+
+    showHintPanel({ icon: level.icon, label: level.label, detail, color: level.color });
+  } catch (e) {
+    console.warn("Hint analysis failed:", e);
+  }
+}
+
+// ── Engine move ───────────────────────────────────────────────────────────────
 
 async function makeEngineMove() {
   try {
@@ -152,7 +200,13 @@ async function makeEngineMove() {
   }
 }
 
+// ── Player move ───────────────────────────────────────────────────────────────
+
 async function onMove(from, to) {
+  // Clear hint from previous move
+  hintArrow = [];
+  clearHintPanel();
+
   if (gameOver || engineThinking) {
     refreshBoard();
     return;
@@ -168,7 +222,6 @@ async function onMove(from, to) {
     const move = game.move({ from, to, promotion: "q" });
     if (!move) { refreshBoard(); return; }
 
-    // Start clock on the very first move
     if (!clock.running) clock.start();
 
     gameStore.addMove({ san: move.san, from: move.from, to: move.to, fenBefore, color: "w" });
@@ -181,33 +234,46 @@ async function onMove(from, to) {
 
     engineThinking = true;
     setEngineThinkingUI(true);
-    setTimeout(async () => {
-      await makeEngineMove();
-    }, 300);
+
+    if (hintsEnabled) {
+      await analyzePlayerMove(fenBefore, move);
+    }
+
+    await makeEngineMove();
   } catch {
     refreshBoard();
   }
 }
 
+// ── Init ──────────────────────────────────────────────────────────────────────
+
 const board = new ChessBoardUI(onMove);
 refreshBoard();
 
-// Refresh board hints when difficulty changes
 document.getElementById("difficulty").addEventListener("change", () => {
   refreshBoard();
 });
 
-// New game
+document.getElementById("hintsToggle").addEventListener("click", () => {
+  hintsEnabled = !hintsEnabled;
+  const btn = document.getElementById("hintsToggle");
+  btn.classList.toggle("active", hintsEnabled);
+  btn.textContent = hintsEnabled ? "💡 Dicas: ON" : "💡 Dicas";
+  if (!hintsEnabled) {
+    hintArrow = [];
+    clearHintPanel();
+    refreshBoard();
+  }
+});
+
 document.getElementById("newGame").addEventListener("click", () => {
   location.reload();
 });
 
-// Close game-over overlay and start new game
 document.getElementById("newGameOverlay").addEventListener("click", () => {
   location.reload();
 });
 
-// Trigger post-game analysis
 document.getElementById("analyzeBtn").addEventListener("click", async () => {
   const btn     = document.getElementById("analyzeBtn");
   const overlay = document.getElementById("gameOverOverlay");
@@ -216,7 +282,6 @@ document.getElementById("analyzeBtn").addEventListener("click", async () => {
   btn.disabled    = true;
   btn.textContent = "Analisando…";
 
-  // Show modal with loading state immediately
   const modal      = document.getElementById("analysisModal");
   const progressEl = document.getElementById("analysisProgress");
   modal.classList.remove("hidden");
@@ -237,7 +302,6 @@ document.getElementById("analyzeBtn").addEventListener("click", async () => {
   showAnalysisModal(results);
 });
 
-// Close analysis modal
 document.getElementById("closeAnalysis").addEventListener("click", () => {
   hideAnalysisModal();
 });

@@ -56,6 +56,23 @@ export function updateOpeningPanel(opening) {
   }
 }
 
+export function showHintPanel({ icon, label, detail, color }) {
+  const panel   = document.getElementById("hint-panel");
+  const iconEl  = document.getElementById("hint-icon");
+  const labelEl = document.getElementById("hint-label");
+  const detailEl = document.getElementById("hint-detail");
+  if (!panel) return;
+  panel.classList.remove("hidden");
+  panel.style.setProperty("--hint-color", color);
+  iconEl.textContent  = icon;
+  labelEl.textContent = label;
+  detailEl.textContent = detail ?? "";
+}
+
+export function clearHintPanel() {
+  document.getElementById("hint-panel")?.classList.add("hidden");
+}
+
 export function resetMoveHistory() {
   moveCount = 0;
   document.getElementById("moves").innerHTML = "";
