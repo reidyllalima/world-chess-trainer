@@ -6,19 +6,19 @@ export class StockfishManager {
     this.engine.postMessage("isready");
   }
 
-  getLimits(level) {
+  getMovetime(level) {
     switch (level) {
-      case "basic":    return { depth: 3,  movetime: 300  };
-      case "medium":   return { depth: 8,  movetime: 1000 };
-      case "advanced": return { depth: 14, movetime: null };
-      case "world":    return { depth: 20, movetime: null };
-      default:         return { depth: 8,  movetime: 1000 };
+      case "basic":    return 500;
+      case "medium":   return 1500;
+      case "advanced": return 3000;
+      case "world":    return 6000;
+      default:         return 1500;
     }
   }
 
   bestMove(fen, level) {
     return new Promise(resolve => {
-      const { depth, movetime } = this.getLimits(level);
+      const movetime = this.getMovetime(level);
 
       const cleanup = (move) => {
         clearTimeout(timeout);
@@ -27,12 +27,10 @@ export class StockfishManager {
         resolve(move);
       };
 
-      // Safety net only for uncapped levels (30s is enough for depth 20)
-      const safetyMs = movetime != null ? movetime + 5000 : 30000;
       const timeout = setTimeout(() => {
         console.warn("Stockfish timeout — unblocking board");
         cleanup("(none)");
-      }, safetyMs);
+      }, movetime + 5000);
 
       const handler = (event) => {
         const line = event.data;
@@ -44,10 +42,7 @@ export class StockfishManager {
       this.busy = true;
       this.engine.addEventListener("message", handler);
       this.engine.postMessage(`position fen ${fen}`);
-      const cmd = movetime != null
-        ? `go depth ${depth} movetime ${movetime}`
-        : `go depth ${depth}`;
-      this.engine.postMessage(cmd);
+      this.engine.postMessage(`go movetime ${movetime}`);
     });
   }
 
