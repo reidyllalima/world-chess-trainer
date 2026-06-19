@@ -13,28 +13,14 @@ const game   = new Chess();
 const engine = new StockfishManager();
 const clock  = new ChessClock(10, 5); // 10 min + 5 sec increment
 
-let engineThinking  = false;
-let gameOver        = false;
-let lastOpeningName = null;
+let engineThinking = false;
+let gameOver       = false;
 
 function refreshOpening() {
   const moves = gameStore.moves;
   if (!moves.length || moves.length > 40) return;
   const opening = detectOpening(moves);
-  if (!opening || opening.name === lastOpeningName) return;
-
-  if (lastOpeningName) {
-    const sameFamily = opening.name.split(':')[0].trim() === lastOpeningName.split(':')[0].trim();
-    if (sameFamily) {
-      // Bloqueia regressão: "Modern Variations" (depth 1) → "Sicilian Defense" (depth 0)
-      const prevDepth = (lastOpeningName.match(/:/g) ?? []).length;
-      const newDepth  = (opening.name.match(/:/g) ?? []).length;
-      if (newDepth < prevDepth) return;
-    }
-  }
-
-  lastOpeningName = opening.name;
-  updateOpeningPanel(opening);
+  if (opening) updateOpeningPanel(opening);
 }
 
 function setEngineThinkingUI(thinking) {
