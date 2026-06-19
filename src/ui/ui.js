@@ -37,6 +37,7 @@ export function addMove(san, color) {
 }
 
 export function updateOpeningPanel(opening) {
+  const panel  = document.getElementById("opening-panel");
   const nameEl = document.getElementById("opening-name");
   const ecoEl  = document.getElementById("opening-eco");
   const tipEl  = document.getElementById("opening-tip");
@@ -47,6 +48,12 @@ export function updateOpeningPanel(opening) {
   nameEl.textContent = opening.name;
   ecoEl.textContent  = opening.eco;
   tipEl.textContent  = advice.tip;
+
+  if (panel) {
+    panel.classList.remove("opening-flash");
+    void panel.offsetWidth;
+    panel.classList.add("opening-flash");
+  }
 }
 
 export function resetMoveHistory() {

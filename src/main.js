@@ -15,12 +15,16 @@ const clock  = new ChessClock(10, 5); // 10 min + 5 sec increment
 
 let engineThinking = false;
 let gameOver       = false;
+let lastMatchLen   = 0;
 
 function refreshOpening() {
   const moves = gameStore.moves;
-  if (!moves.length || moves.length > 40) return;
+  if (!moves.length) return;
   const opening = detectOpening(moves);
-  if (opening) updateOpeningPanel(opening);
+  if (opening && opening.matchLen >= lastMatchLen) {
+    lastMatchLen = opening.matchLen;
+    updateOpeningPanel(opening);
+  }
 }
 
 function setEngineThinkingUI(thinking) {

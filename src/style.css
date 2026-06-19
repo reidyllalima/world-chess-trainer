@@ -191,6 +191,14 @@ main {
   line-height: 1.55;
 }
 
+@keyframes opening-flash {
+  0%   { background-color: rgba(122, 180, 232, 0.18); }
+  100% { background-color: transparent; }
+}
+.opening-flash {
+  animation: opening-flash 0.7s ease-out;
+}
+
 /* ── Aside (move history) ────────────────────────────────────────── */
 
 aside {
