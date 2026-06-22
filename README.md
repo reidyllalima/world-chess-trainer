@@ -43,7 +43,7 @@ Baseada na perda de avaliação (em peões) comparada à melhor jogada do Stockf
 - [Vite](https://vitejs.dev/) — build tool
 - [Chessground](https://github.com/lichess-org/chessground) — tabuleiro de xadrez (UI do Lichess)
 - [chess.js](https://github.com/jhlywa/chess.js) — regras e validação de movimentos
-- [Stockfish 18](https://stockfishchess.org/) — motor de xadrez (WebAssembly)
+- [Stockfish 18 Lite](https://stockfishchess.org/) — motor de xadrez (WebAssembly, ~7 MB)
 - [Playwright](https://playwright.dev/) — teste de fumaça end-to-end (apenas dev)
 
 ## Como rodar
@@ -52,9 +52,6 @@ Baseada na perda de avaliação (em peões) comparada à melhor jogada do Stockf
 # Instalar dependências
 npm install
 
-# Os arquivos WASM do Stockfish (~108 MB cada) não vão no repositório.
-# Baixe e coloque stockfish-18.wasm e stockfish-18-single.wasm em public/stockfish/
-
 # Desenvolvimento
 npm run dev
 
@@ -62,10 +59,11 @@ npm run dev
 npm run build
 ```
 
-> **Nota:** os `.wasm` do Stockfish não estão no repositório (ver `.gitignore`).
-> Baixe-os em [stockfishchess.org](https://stockfishchess.org/download/) e coloque
-> em `public/stockfish/`. O livro de aberturas (`src/openings/openingBook.js`) é
-> gerado automaticamente pelo passo `prebuild`.
+> **Motor:** usa o **Stockfish 18 Lite** (`public/stockfish/stockfish-18-lite-single.wasm`,
+> ~7 MB), que já vai no repositório — nada para baixar. O build *full* (108 MB) é
+> grande demais para hospedagem/Git; o Lite tem força praticamente idêntica e carrega
+> muito mais rápido. O livro de aberturas (`src/openings/openingBook.js`) é gerado
+> automaticamente pelo passo `prebuild`.
 
 ## Testes
 

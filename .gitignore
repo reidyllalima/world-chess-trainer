@@ -1,6 +1,5 @@
 node_modules/
 dist/
 .claude/
-public/stockfish/*.wasm
 .vercel
 src/openings/openingBook.js

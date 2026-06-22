@@ -17,7 +17,7 @@ const WATCHDOG_MS = 20000;
 
 export class StockfishManager {
   constructor() {
-    this.engine = new Worker("/stockfish/stockfish-18-single.js", { type: "classic" });
+    this.engine = new Worker("/stockfish/stockfish-18-lite-single.js", { type: "classic" });
     this.engine.postMessage("uci");
     this.engine.postMessage("isready");
     // Tail of the promise chain that serializes every engine request.
