@@ -73,11 +73,6 @@ export function clearHintPanel() {
   document.getElementById("hint-panel")?.classList.add("hidden");
 }
 
-export function resetMoveHistory() {
-  moveCount = 0;
-  document.getElementById("moves").innerHTML = "";
-}
-
 export function showGameOver(message) {
   const overlay = document.getElementById("gameOverOverlay");
   document.getElementById("gameOverMessage").textContent = message;

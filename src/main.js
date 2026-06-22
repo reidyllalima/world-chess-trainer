@@ -4,7 +4,7 @@ import { StockfishManager } from "./engine/stockfishManager.js";
 import { Chess } from "chess.js";
 import { ChessClock } from "./clock/chessClock.js";
 import { ChessBoardUI } from "./board/board.js";
-import { addMove, resetMoveHistory, showGameOver, showAnalysisModal, hideAnalysisModal, attachAnalysisToHistory, updateOpeningPanel, showHintPanel, clearHintPanel } from "./ui/ui.js";
+import { addMove, showGameOver, showAnalysisModal, hideAnalysisModal, attachAnalysisToHistory, updateOpeningPanel, showHintPanel, clearHintPanel } from "./ui/ui.js";
 import { detectOpening } from "./openings/openingDetector.js";
 import { gameStore } from "./data/gameStore.js";
 import { analyzeGame } from "./analysis/gameAnalyzer.js";
@@ -30,14 +30,14 @@ function refreshOpening() {
 }
 
 function setEngineThinkingUI(thinking) {
-  const dot   = document.getElementById("thinkingDot");
-  const clock = document.getElementById("clockBlack");
+  const dot     = document.getElementById("thinkingDot");
+  const clockEl = document.getElementById("clockBlack");
   if (thinking) {
     dot.classList.add("active");
-    clock.classList.add("engine-thinking");
+    clockEl.classList.add("engine-thinking");
   } else {
     dot.classList.remove("active");
-    clock.classList.remove("engine-thinking");
+    clockEl.classList.remove("engine-thinking");
   }
 }
 
@@ -113,48 +113,106 @@ function endGame(message, result) {
   showGameOver(message);
 }
 
-// ── Hint analysis ─────────────────────────────────────────────────────────────
+// ── Hints: live suggestion (before your move) + evaluation (after) ─────────────
 
-const HINT_LEVELS = [
-  { maxLoss: 10,  icon: "✦",  label: "Excelente!",   color: "#21C063" },
-  { maxLoss: 50,  icon: "✓",  label: "Boa jogada!",  color: "#2DB582" },
-  { maxLoss: 150, icon: "?!", label: "Imprecisão",   color: "#EFA010" },
-  { maxLoss: 400, icon: "?",  label: "Erro!",        color: "#D84040" },
-  { maxLoss: Infinity, icon: "??", label: "Grave Erro!", color: "#C0392B" },
-];
+const HINT_DEPTH    = 12;
+const HINT_MOVETIME = 1200;
 
-async function analyzePlayerMove(fenBefore, playerMove) {
+let suggestion    = null; // { fen, bestMove, bestScore } for the current player turn
+let suggestionSeq = 0;    // guards against stale async suggestions
+
+function uciToSan(fen, uci) {
+  if (!uci || uci === "(none)") return uci;
   try {
-    const { bestMove, score: bestScore } = await engine.analyzePosition(fenBefore, 10);
-    const { score: scoreFromBlack }      = await engine.analyzePosition(game.fen(), 8);
+    const tmp = new Chess(fen);
+    const m = tmp.move({ from: uci.slice(0, 2), to: uci.slice(2, 4), promotion: uci[4] || "q" });
+    return m ? m.san : uci;
+  } catch {
+    return uci;
+  }
+}
 
-    const playerScore = -scoreFromBlack; // convert to white's perspective
-    const scoreLoss   = Math.max(0, bestScore - playerScore);
+function moveReason(san) {
+  if (san.includes("#"))                 return "dá xeque-mate!";
+  if (san.includes("+"))                 return "dá xeque e ganha tempo";
+  if (san.includes("="))                 return "promove o peão";
+  if (san === "O-O" || san === "O-O-O")  return "coloca o rei em segurança";
+  if (san.includes("x"))                 return "captura material";
+  if (/^[NB]/.test(san))                 return "desenvolve uma peça ativa";
+  if (/^[a-h][45]$/.test(san))           return "ocupa o centro";
+  if (/^[KQR]/.test(san))                return "melhora a peça e a posição";
+  return "melhora a sua posição";
+}
 
-    const playerUci  = playerMove.from + playerMove.to;
-    const isBestMove = bestMove && playerUci === bestMove.slice(0, 4);
+// Analyze the current position and show an arrow + label suggesting a good move
+// the player can play right now. Bails out if the position changes meanwhile.
+async function showSuggestion() {
+  if (!hintsEnabled || gameOver || engineThinking || game.turn() !== "w") return;
 
-    const level = isBestMove
-      ? HINT_LEVELS[0]
-      : HINT_LEVELS.find(l => scoreLoss <= l.maxLoss) ?? HINT_LEVELS.at(-1);
+  const fen = game.fen();
+  const seq = ++suggestionSeq;
 
-    let detail = isBestMove ? "Melhor jogada possível!" : "";
+  let res;
+  try {
+    res = await engine.analyzePosition(fen, HINT_DEPTH, HINT_MOVETIME);
+  } catch {
+    return;
+  }
 
-    if (!isBestMove && bestMove && bestMove !== "(none)") {
-      try {
-        const tmp = new Chess(fenBefore);
-        const bm  = tmp.move({ from: bestMove.slice(0, 2), to: bestMove.slice(2, 4), promotion: bestMove[4] || "q" });
-        detail = `Melhor era ${bm.san}`;
-      } catch {
-        detail = `Melhor era ${bestMove}`;
-      }
-      hintArrow = [{ orig: bestMove.slice(0, 2), dest: bestMove.slice(2, 4), brush: "green" }];
-      refreshBoard();
+  // Discard if anything moved on while we were thinking.
+  if (seq !== suggestionSeq || !hintsEnabled || gameOver || game.fen() !== fen) return;
+
+  const { bestMove, score } = res;
+  if (!bestMove || bestMove === "(none)") return;
+
+  suggestion = { fen, bestMove, bestScore: score };
+  hintArrow  = [{ orig: bestMove.slice(0, 2), dest: bestMove.slice(2, 4), brush: "green" }];
+
+  const san = uciToSan(fen, bestMove);
+  showHintPanel({ icon: "💡", label: `Sugestão: ${san}`, detail: moveReason(san), color: "#21C063" });
+  refreshBoard();
+}
+
+function classifyLoss(loss) {
+  if (loss <= 30)  return { icon: "✦",  label: "Excelente!",   color: "#21C063", nag: false };
+  if (loss <= 90)  return { icon: "✓",  label: "Boa jogada!",  color: "#2DB582", nag: false };
+  if (loss <= 200) return { icon: "?!", label: "Imprecisão",   color: "#EFA010", nag: true  };
+  if (loss <= 450) return { icon: "?",  label: "Erro!",        color: "#D84040", nag: true  };
+  return             { icon: "??", label: "Grave Erro!", color: "#C0392B", nag: true  };
+}
+
+// Evaluate the move the player just made (game already advanced past it).
+async function evaluatePlayerMove(fenBefore, playerMove) {
+  try {
+    // Reuse the suggestion's analysis when it matches this position.
+    let bestMove, bestScore;
+    if (suggestion && suggestion.fen === fenBefore) {
+      ({ bestMove, bestScore } = suggestion);
+    } else {
+      const r = await engine.analyzePosition(fenBefore, HINT_DEPTH, HINT_MOVETIME);
+      bestMove = r.bestMove;
+      bestScore = r.score;
     }
 
-    showHintPanel({ icon: level.icon, label: level.label, detail, color: level.color });
+    const playerUci = playerMove.from + playerMove.to;
+    const followed  = bestMove && bestMove !== "(none)" && playerUci === bestMove.slice(0, 4);
+    if (followed) {
+      showHintPanel({ icon: "✦", label: "Excelente!", detail: "Você seguiu a sugestão!", color: "#21C063" });
+      return;
+    }
+
+    const { score: scoreFromBlack } = await engine.analyzePosition(game.fen(), HINT_DEPTH, HINT_MOVETIME);
+    const loss = Math.max(0, bestScore - (-scoreFromBlack)); // both in white's perspective
+
+    const v = classifyLoss(loss);
+    let detail = "Lance sólido.";
+    if (v.nag && bestMove && bestMove !== "(none)") {
+      const bestSan = uciToSan(fenBefore, bestMove);
+      detail = `Melhor era ${bestSan} — ${moveReason(bestSan)}`;
+    }
+    showHintPanel({ icon: v.icon, label: v.label, detail, color: v.color });
   } catch (e) {
-    console.warn("Hint analysis failed:", e);
+    console.warn("Hint evaluation failed:", e);
   }
 }
 
@@ -166,19 +224,24 @@ async function makeEngineMove() {
 
     const fenBefore = game.fen();
     const level     = document.getElementById("difficulty").value;
-    const bestMove  = await engine.bestMove(fenBefore, level);
+    let uci         = await engine.bestMove(fenBefore, level);
 
-    if (!bestMove || bestMove === "(none)") {
-      checkGameOver();
-      return;
+    // Safety net: if the engine returns nothing but the game isn't actually over,
+    // play any legal move so the board can never soft-lock on the engine's turn.
+    if (!uci || uci === "(none)") {
+      if (checkGameOver()) return;
+      const legal = game.moves({ verbose: true });
+      if (!legal.length) { checkGameOver(); return; }
+      const pick = legal[Math.floor(Math.random() * legal.length)];
+      uci = pick.from + pick.to + (pick.promotion ?? "");
     }
 
     let move;
     try {
       move = game.move({
-        from:      bestMove.slice(0, 2),
-        to:        bestMove.slice(2, 4),
-        promotion: bestMove[4] || "q",
+        from:      uci.slice(0, 2),
+        to:        uci.slice(2, 4),
+        promotion: uci[4] || "q",
       });
     } catch {
       return;
@@ -187,6 +250,7 @@ async function makeEngineMove() {
     if (move) {
       gameStore.addMove({ san: move.san, from: move.from, to: move.to, fenBefore, color: "b" });
       addMove(move.san, "b");
+      hintArrow = []; // engine has replied — drop the now-stale hint arrow
       clock.switchTurn();
       refreshOpening();
       checkGameOver();
@@ -203,9 +267,11 @@ async function makeEngineMove() {
 // ── Player move ───────────────────────────────────────────────────────────────
 
 async function onMove(from, to) {
-  // Clear hint from previous move
+  // The player committed a move: drop the suggestion arrow/panel and cancel any
+  // suggestion analysis still in flight for the previous position.
   hintArrow = [];
   clearHintPanel();
+  suggestionSeq++;
 
   if (gameOver || engineThinking) {
     refreshBoard();
@@ -236,10 +302,13 @@ async function onMove(from, to) {
     setEngineThinkingUI(true);
 
     if (hintsEnabled) {
-      await analyzePlayerMove(fenBefore, move);
+      await evaluatePlayerMove(fenBefore, move);
     }
 
     await makeEngineMove();
+
+    // Engine has replied — suggest a move for the new white turn.
+    if (hintsEnabled) showSuggestion();
   } catch {
     refreshBoard();
   }
@@ -259,8 +328,12 @@ document.getElementById("hintsToggle").addEventListener("click", () => {
   const btn = document.getElementById("hintsToggle");
   btn.classList.toggle("active", hintsEnabled);
   btn.textContent = hintsEnabled ? "💡 Dicas: ON" : "💡 Dicas";
-  if (!hintsEnabled) {
-    hintArrow = [];
+  if (hintsEnabled) {
+    showSuggestion();           // suggest right away if it is the player's turn
+  } else {
+    suggestionSeq++;            // cancel any pending suggestion
+    suggestion = null;
+    hintArrow  = [];
     clearHintPanel();
     refreshBoard();
   }
