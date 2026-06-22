@@ -1,4 +1,5 @@
 import "./style.css";
+import { inject } from '@vercel/analytics';
 
 import { StockfishManager } from "./engine/stockfishManager.js";
 import { Chess } from "chess.js";
@@ -246,6 +247,9 @@ async function onMove(from, to) {
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
+
+// Initialize Vercel Analytics
+inject();
 
 const board = new ChessBoardUI(onMove);
 refreshBoard();
